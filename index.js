@@ -1,18 +1,8 @@
 const http = require('node:http');
 const fs = require('node:fs');
-var mysql = require('mysql');
+const { Buffer } = require('node:buffer');
 
-var con = mysql.createConnection({
-    host: "localhost",
-    user: "root",
-    password: "",
-    database: "nodebasicdb"
-});
-
-con.connect(function(err){
-    if(err) throw err;
-    console.log("Connected!");
-});
+const con = require('./connection');
 
 const server = http.createServer((req, res) => {
 
@@ -29,30 +19,20 @@ const server = http.createServer((req, res) => {
         res.statusCode = 200;
         res.method = 'GET';
         res.setHeader('Content-Type', 'text/html');
-    
-        // Melakukan query ke database untuk mendapatkan data yang ingin ditampilkan
-        var data = con.query("SELECT * FROM student", function (err, result, fields) {
+
+        let view = fs.readFileSync('views/form.html', 'utf-8');
+
+        let data = con.query("SELECT * FROM student", function (err, result, fields) {
             if (err) {
                 console.error("Error occurred while fetching data:", err);
                 // Tambahkan penanganan kesalahan di sini
                 return;
             }
-            console.log(result[0].name);
-    
-            let data = fs.readFileSync('views/form.html', 'utf-8');
-    
-            // Memasukkan data dari hasil query ke dalam form.html
-            data = data.replace('{name}', result[0].name); 
-            // data = data.replace('{age}', result[0].age); 
-            
-            console.log(data);
-    
-            // Mengirim halaman HTML yang telah diperbarui dengan data dari database
-            res.write(data);
-            return res.end();
-        });
 
-        console.log(data);
+            return result;
+        });
+        
+        res.write(view);
     }
 
     if (req.url === '/save' && req.method === 'POST') {
