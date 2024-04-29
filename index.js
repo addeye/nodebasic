@@ -1,102 +1,56 @@
-const http = require('node:http');
-const fs = require('node:fs');
-const { Buffer } = require('node:buffer');
+const http = require("http");
 
-const con = require('./connection');
+const routes = [
+  {
+    path: "*",
+    middleware: [
+      (req, res, next) => {
+        console.log(req);
+        res.json({ message: "ok" });
+      },
+    ],
+  },
+];
 
-const server = http.createServer((req, res) => {
+const handleRequest = async (req, res) => {
+  res.json = (body) => {
+    res.writeHead(200, {
+      "Content-Type": "application/json",
+    });
+    body = JSON.stringify(body);
+    res.send(body)
+  };
 
-    if(req.url === '/'){
-        res.statusCode = 200;
-        res.method = 'GET';
-        res.setHeader('Content-Type', 'text/html');
-        
-        let data = fs.readFileSync('views/index.html', 'utf-8');
-        res.write(data);
-    }   
 
-    if(req.url === '/form'){
-        res.statusCode = 200;
-        res.method = 'GET';
-        res.setHeader('Content-Type', 'text/html');
+  res.send = (body) => {
+    res.done=true
+    res.end(body);
+  };
 
-        let view = fs.readFileSync('views/form.html', 'utf-8');
+  res.sendFile = () => {};
 
-        let data = con.query("SELECT * FROM student", function (err, result, fields) {
-            if (err) {
-                console.error("Error occurred while fetching data:", err);
-                // Tambahkan penanganan kesalahan di sini
-                return;
-            }
-
-            return result;
+  for (const route of routes) {
+    const regexp = new RegExp(
+      "^" + route.path.replace(/\*/, "(?:.*)") + "(?:/?$)",
+      "i"
+    );
+    const matches = req.url.match(regexp);
+    if (!matches) {
+      continue;
+    }
+    for (const middleware of route.middleware) {
+      await new Promise((resolve, reject) => {
+        middleware(req, res, () => {
+          if (next) reject();
+          else resolve();
         });
-        
-        res.write(view);
+      });
+      if(res.done)break
     }
+    if(res.done)break
+  }
 
-    if (req.url === '/save' && req.method === 'POST') {
-        
-    
-        let body = [];
-        req.on('data', (chunk) => {
-            body.push(chunk);
-        });
-    
-        req.on('end', () => {
-            body = Buffer.concat(body).toString();
-    
-            // Parsing data dari form
-            const formData = {};
-            body.split('&').forEach(keyValue => {
-                const [key, value] = keyValue.split('=');
-                formData[key] = decodeURIComponent(value.replace(/\+/g, ' '));
-            });
-    
-            // Menyimpan data ke dalam database
-            con.query("INSERT INTO student (id, name, age) VALUES (NULL, ?, ?)", [formData.name, formData.age], function (err, result) {
-                if (err) {
-                    res.write('Error occurred while saving data');
-                    return res.end('Error occurred while saving data');
-                }
-                console.log("1 record inserted");
-                return res.end('Data has been saved');
-                
-            });
-        });
-
-        res.statusCode = 302; // 302 Found (temporary redirect)
-        res.setHeader('Location', '/form'); // Redirect to success page
-        return res.end();
-    }
-
-    if(req.url === '/about'){
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'text/html');
-        let data = fs.readFileSync('views/about.html', 'utf-8');
-        res.write(data);
-    }
-
-    if(req.url === '/contact'){
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'text/html');
-
-        let data = fs.readFileSync('views/contact.html', 'utf-8');
-        res.write(data);
-    }
-
-    if(req.url === '/api'){
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'application/json');
-        let data = {
-            name: 'John Doe',
-            age: 30
-        }
-        res.write(JSON.stringify(data));
-    }
-
-    res.end();
-
+};
+const server = http.createServer(handleRequest).listen(3000, () => {
+  console.log(server.address());
 });
-
-server.listen(3000);
