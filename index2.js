@@ -5,14 +5,14 @@ const { Buffer } = require('node:buffer');
 
 const con = require('./connection');
 
-const server = http.createServer(async (req, res) => {
-
+const httpHandlers = async (req, res) => {
+    
     if(req.url === '/'){
         res.statusCode = 200;
         res.method = 'GET';
         res.setHeader('Content-Type', 'text/html');
         
-        let data = fs.readFileSync('views/index.html', 'utf-8');
+        let data = fs.readFileSync('views/index.html', 'utf-8'); 
         res.write(data);
     }   
 
@@ -21,21 +21,21 @@ const server = http.createServer(async (req, res) => {
             res.statusCode = 200;
             res.method = 'GET';
             res.setHeader('Content-Type', 'text/html');
-    
-            
-    
-            con.query = util.promisify(con.query)
-    
-            let data = await con.query("SELECT * FROM student",);
-            
-            console.log(data)
-    
-            // let view = fs.readFileSync('views/form.html', 'utf-8');
-            // res.write(view);
-    
-            const stream = fs.createReadStream(process.cwd()+'/views/form.html')
-            console.log(toString.call(stream))
-            stream.pipe(res)
+
+
+            let view = fs.readFileSync('views/form.html', 'utf-8');
+
+            let data = con.query("SELECT * FROM student", function (err, result, fields) {
+                if (err) throw err;
+                return result;
+            });
+
+            console.log(await data);
+
+            // view = view.replace("{{name}}", data[0].name);
+
+            res.write(view);
+
         } catch (error) {
             console.log(error)
         }
@@ -102,7 +102,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     res.end();
+}
 
-});
+const server = http.createServer(httpHandlers);
 
 server.listen(3000);
