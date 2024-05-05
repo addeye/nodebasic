@@ -5,6 +5,34 @@ const { Buffer } = require('node:buffer');
 
 const con = require('./connection');
 
+const blade = (view, data) => {
+
+    const replacementRegex = /\{\{\s*([\w.]+)\s*\}\}/g;
+
+    const students = [
+        { id: 1, name: 'John', age: 20 },
+        { id: 2, name: 'Alice', age: 22 },
+        { id: 3, name: 'Bob', age: 21 }
+    ];
+
+    // Penggantian regex untuk mencocokkan {% for ... %} dan {% endfor %}
+    const forRegex = /\{%\s*for\s+(.*?)\s+in\s+(.*?)\s*%\}([\s\S]*?)\{%\s*endfor\s*%\}/g;
+
+    // Fungsi penggantian untuk mengganti setiap pencocokan regex dengan nilai yang sesuai
+    view = view.replace(forRegex, (match, iterator, iterable, body) => {
+        let output = '';
+        for (const item of students) {
+            let replacedBody = body.replace(/{{\s*(.*?)\s*}}/g, (match, key) => {
+                return JSON.stringify(item[key.trim()]);
+            });
+            output += replacedBody;
+        }
+        return output;
+    });
+
+    return view;
+}
+
 const httpHandlers = async (req, res) => {
     
     if(req.url === '/'){
@@ -17,28 +45,22 @@ const httpHandlers = async (req, res) => {
     }   
 
     if(req.url === '/form'){
-        try {
-            res.statusCode = 200;
-            res.method = 'GET';
-            res.setHeader('Content-Type', 'text/html');
+        res.statusCode = 200;
+        res.method = 'GET';
+        res.setHeader('Content-Type', 'text/html');
 
+        var view = fs.readFileSync('views/form.html', 'utf-8');
 
-            let view = fs.readFileSync('views/form.html', 'utf-8');
-
-            let data = con.query("SELECT * FROM student", function (err, result, fields) {
+        var data = await new Promise((resolve, reject) => {
+            con.query("SELECT * FROM student", function (err, result, fields) {
                 if (err) throw err;
-                return result;
+                resolve(result);
             });
+        })
 
-            console.log(await data);
-
-            // view = view.replace("{{name}}", data[0].name);
-
-            res.write(view);
-
-        } catch (error) {
-            console.log(error)
-        }
+        view = blade(view, data);
+        
+        res.write(view);
     }
 
     if (req.url === '/save' && req.method === 'POST') {
